@@ -142,6 +142,67 @@ class ValidatorTests(unittest.TestCase):
                 fixture, "frontmatter key name must not be duplicated"
             )
 
+    def test_validator_rejects_plain_scalar_yaml_breakers(self):
+        invalid_descriptions = (
+            "description: Use when foo: bar",
+            "description: Use when foo:",
+            "description: Use when foo # inline comment",
+        )
+        for description in invalid_descriptions:
+            with (
+                self.subTest(description=description),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                skill_file = self._skill_file(fixture)
+                lines = skill_file.read_text().splitlines()
+                lines[2] = description
+                skill_file.write_text("\n".join(lines) + "\n")
+
+                self._assert_rejected(
+                    fixture,
+                    "frontmatter plain scalar values must not contain YAML "
+                    "mapping or comment syntax",
+                )
+
+    def test_validator_rejects_tabs_in_frontmatter(self):
+        invalid_lines = (
+            "name:\tcodex-implement-change",
+            "description: Use when foo\tbar",
+        )
+        for line in invalid_lines:
+            with (
+                self.subTest(line=line),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                skill_file = self._skill_file(fixture)
+                lines = skill_file.read_text().splitlines()
+                lines[1 if line.startswith("name") else 2] = line
+                skill_file.write_text("\n".join(lines) + "\n")
+
+                self._assert_rejected(
+                    fixture, "frontmatter must not contain tab characters"
+                )
+
+    def test_validator_rejects_punctuation_only_trigger_text(self):
+        for trigger in ("---", "?!"):
+            with (
+                self.subTest(trigger=trigger),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                skill_file = self._skill_file(fixture)
+                lines = skill_file.read_text().splitlines()
+                lines[2] = f"description: Use when {trigger}"
+                skill_file.write_text("\n".join(lines) + "\n")
+
+                self._assert_rejected(
+                    fixture,
+                    "frontmatter description must begin with Use when and "
+                    "include trigger text",
+                )
+
     def test_validator_reports_malformed_frontmatter_and_missing_reference(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._copy_skills(directory)

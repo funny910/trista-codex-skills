@@ -49,12 +49,16 @@ def _frontmatter(
     seen_keys: set[str] = set()
     rules: list[str] = []
     for line in lines[1:closing]:
+        if "\t" in line:
+            rules.append("frontmatter must not contain tab characters")
+            continue
+
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
 
         match = re.fullmatch(
-            r"([A-Za-z_][A-Za-z0-9_-]*):[ \t]+([^\r\n]+)", line
+            r"([A-Za-z_][A-Za-z0-9_-]*): +([^\r\n]+)", line
         )
         if match is None:
             rules.append(
@@ -64,6 +68,12 @@ def _frontmatter(
             continue
 
         key, value = match.group(1), match.group(2).strip()
+        if re.search(r":(?: |$)|(?:^| )#", value):
+            rules.append(
+                "frontmatter plain scalar values must not contain YAML "
+                "mapping or comment syntax"
+            )
+            continue
         if key in seen_keys:
             rules.append(f"frontmatter key {key} must not be duplicated")
             continue
@@ -134,7 +144,8 @@ def _validate_frontmatter(
         )
 
     description = values.get("description", "")
-    if re.fullmatch(r"Use when\s+\S.*", description) is None:
+    trigger = re.fullmatch(r"Use when +(.+)", description)
+    if trigger is None or re.search(r"\w", trigger.group(1)) is None:
         findings.append(
             f"{_shown(skill_file, root)}: frontmatter description must begin with Use when and include trigger text"
         )
