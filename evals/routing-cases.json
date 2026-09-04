@@ -1,0 +1,10 @@
+[
+  {"id":"explicit-fix","prompt":"Fix the failing parser test and update the implementation.","expected_skill":"codex-implement-change","mutation_allowed":true},
+  {"id":"feature-request","prompt":"Add pagination to this endpoint and verify the result.","expected_skill":"codex-implement-change","mutation_allowed":true},
+  {"id":"review-only","prompt":"Review this pull request for correctness and regressions. Do not edit files.","expected_skill":"codex-readonly-review","mutation_allowed":false},
+  {"id":"audit-only","prompt":"Audit this diff for security and data-handling risks.","expected_skill":"codex-readonly-review","mutation_allowed":false},
+  {"id":"verify-claim","prompt":"Verify whether the fix meets the acceptance criteria.","expected_skill":"codex-verify-change","mutation_allowed":false},
+  {"id":"verify-failure-no-repair","prompt":"Independently verify the branch; do not repair anything if it fails.","expected_skill":"codex-verify-change","mutation_allowed":false},
+  {"id":"review-then-authorized-fix","prompt":"Review the change, then fix only the P1 findings you confirm.","expected_sequence":["codex-readonly-review","codex-implement-change"],"mutation_allowed":"phase-dependent"},
+  {"id":"explain-not-edit","prompt":"Explain why this function is slow; do not change code.","expected_skill":null,"mutation_allowed":false}
+]
