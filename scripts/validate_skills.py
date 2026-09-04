@@ -79,6 +79,13 @@ def _validate_frontmatter(
     if content is None:
         return None
 
+    for target in re.findall(r"\]\((references/[^)\s]+)", content):
+        reference = skill_file.parent / target.split("#", 1)[0]
+        if not reference.is_file():
+            findings.append(
+                f"{_shown(skill_file, root)}: local reference target {target} must exist"
+            )
+
     values = _frontmatter(content)
     if values is None:
         findings.append(
@@ -98,13 +105,6 @@ def _validate_frontmatter(
         )
     else:
         descriptions.setdefault(description, []).append(skill_file)
-
-    for target in re.findall(r"\]\((references/[^)\s]+)", content):
-        reference = skill_file.parent / target.split("#", 1)[0]
-        if not reference.is_file():
-            findings.append(
-                f"{_shown(skill_file, root)}: local reference target {target} must exist"
-            )
 
     return content
 
@@ -134,7 +134,8 @@ def _validate_agent_metadata(
         values[key] = value
 
     default_prompt = values.get("default_prompt", "")
-    if default_prompt and f"${skill_name}" not in default_prompt:
+    skill_token = re.compile(rf"\${re.escape(skill_name)}(?![A-Za-z0-9_-])")
+    if default_prompt and not skill_token.search(default_prompt):
         findings.append(
             f"{_shown(metadata_file, root)}: interface.default_prompt must name ${skill_name}"
         )
@@ -226,7 +227,7 @@ def validate_repo(root: Path) -> list[str]:
                     f"{_shown(path, root)}: frontmatter description must be unique across skills"
                 )
 
-    return findings
+    return list(dict.fromkeys(findings))
 
 
 def main(argv: list[str] | None = None) -> int:
