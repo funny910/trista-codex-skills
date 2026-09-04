@@ -55,6 +55,18 @@ class ValidatorTests(unittest.TestCase):
             text=True,
         )
 
+    def _skill_file(self, fixture, skill_name="codex-implement-change"):
+        return Path(fixture) / "skills" / skill_name / "SKILL.md"
+
+    def _metadata_file(self, fixture, skill_name="codex-implement-change"):
+        return Path(fixture) / "skills" / skill_name / "agents" / "openai.yaml"
+
+    def _assert_rejected(self, fixture, expected_rule):
+        result = self._run_validator(fixture)
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertEqual("", result.stderr)
+        self.assertIn(expected_rule, result.stdout)
+
     def test_validator_accepts_repository(self):
         result = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "validate_skills.py"), str(ROOT)],
@@ -81,6 +93,54 @@ class ValidatorTests(unittest.TestCase):
             )
             self.assertNotEqual(0, result.returncode)
             self.assertIn("frontmatter name", result.stdout)
+
+    def test_validator_rejects_orphan_frontmatter_sequence_line(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            skill_file.write_text(
+                skill_file.read_text().replace(
+                    "description: Use when",
+                    "- orphan-sequence-item\ndescription: Use when",
+                    1,
+                )
+            )
+
+            self._assert_rejected(
+                fixture,
+                "frontmatter must contain only top-level scalar mappings for "
+                "name and description",
+            )
+
+    def test_validator_rejects_empty_use_when_trigger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            lines = skill_file.read_text().splitlines()
+            lines[2] = "description: Use when"
+            skill_file.write_text("\n".join(lines) + "\n")
+
+            self._assert_rejected(
+                fixture,
+                "frontmatter description must begin with Use when and include "
+                "trigger text",
+            )
+
+    def test_validator_rejects_duplicate_frontmatter_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            skill_file.write_text(
+                skill_file.read_text().replace(
+                    "name: codex-implement-change",
+                    "name: codex-implement-change\nname: codex-implement-change",
+                    1,
+                )
+            )
+
+            self._assert_rejected(
+                fixture, "frontmatter key name must not be duplicated"
+            )
 
     def test_validator_reports_malformed_frontmatter_and_missing_reference(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -128,6 +188,66 @@ class ValidatorTests(unittest.TestCase):
             self.assertIn(
                 "ERROR: skills/codex-implement-change/agents/openai.yaml: "
                 "interface.default_prompt must name $codex-implement-change",
+                result.stdout,
+            )
+
+    def test_validator_rejects_false_or_missing_implicit_invocation(self):
+        replacements = {
+            "false": "  allow_implicit_invocation: false",
+            "missing": "",
+        }
+        for case, replacement in replacements.items():
+            with (
+                self.subTest(case=case),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                metadata_file = self._metadata_file(fixture)
+                metadata_file.write_text(
+                    metadata_file.read_text().replace(
+                        "  allow_implicit_invocation: true", replacement, 1
+                    )
+                )
+
+                self._assert_rejected(
+                    fixture, "policy.allow_implicit_invocation must be true"
+                )
+
+    def test_validator_rejects_unfinished_markers(self):
+        for marker in ("TODO", "TBD"):
+            with (
+                self.subTest(marker=marker),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                skill_file = self._skill_file(fixture)
+                skill_file.write_text(skill_file.read_text() + f"\n{marker}\n")
+
+                self._assert_rejected(
+                    fixture,
+                    "shipped skill content must not contain unfinished marker token(s): "
+                    f"{marker}",
+                )
+
+    def test_validator_rejects_duplicate_descriptions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            source_file = self._skill_file(fixture)
+            duplicate_file = self._skill_file(fixture, "codex-readonly-review")
+            source_description = source_file.read_text().splitlines()[2]
+            duplicate_lines = duplicate_file.read_text().splitlines()
+            duplicate_lines[2] = source_description
+            duplicate_file.write_text("\n".join(duplicate_lines) + "\n")
+
+            result = self._run_validator(fixture)
+
+            self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+            self.assertEqual("", result.stderr)
+            self.assertEqual(
+                2,
+                result.stdout.count(
+                    "frontmatter description must be unique across skills"
+                ),
                 result.stdout,
             )
 

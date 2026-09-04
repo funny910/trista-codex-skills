@@ -13,6 +13,7 @@ EXPECTED_SKILLS = {
 }
 REQUIRED_FILES = ("SKILL.md", "agents/openai.yaml")
 REQUIRED_INTERFACE_KEYS = ("display_name", "short_description", "default_prompt")
+SUPPORTED_FRONTMATTER_KEYS = {"name", "description"}
 UNFINISHED_MARKERS = ("TODO", "TBD")
 
 
@@ -33,21 +34,48 @@ def _read_text(path: Path, root: Path, findings: list[str]) -> Optional[str]:
         return None
 
 
-def _frontmatter(content: str) -> Optional[dict[str, str]]:
+def _frontmatter(
+    content: str,
+) -> tuple[Optional[dict[str, str]], list[str]]:
     lines = content.splitlines()
     if not lines or lines[0] != "---":
-        return None
+        return None, []
     try:
         closing = lines.index("---", 1)
     except ValueError:
-        return None
+        return None, []
 
     values: dict[str, str] = {}
+    seen_keys: set[str] = set()
+    rules: list[str] = []
     for line in lines[1:closing]:
-        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)", line)
-        if match:
-            values[match.group(1)] = match.group(2).strip()
-    return values
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        match = re.fullmatch(
+            r"([A-Za-z_][A-Za-z0-9_-]*):[ \t]+([^\r\n]+)", line
+        )
+        if match is None:
+            rules.append(
+                "frontmatter must contain only top-level scalar mappings for "
+                "name and description"
+            )
+            continue
+
+        key, value = match.group(1), match.group(2).strip()
+        if key in seen_keys:
+            rules.append(f"frontmatter key {key} must not be duplicated")
+            continue
+        seen_keys.add(key)
+        if key not in SUPPORTED_FRONTMATTER_KEYS:
+            rules.append(
+                f"frontmatter key {key} is unsupported; expected name or description"
+            )
+            continue
+        values[key] = value
+
+    return values, rules
 
 
 def _section_value(content: str, section: str, key: str) -> Optional[str]:
@@ -86,22 +114,29 @@ def _validate_frontmatter(
                 f"{_shown(skill_file, root)}: local reference target {target} must exist"
             )
 
-    values = _frontmatter(content)
+    values, frontmatter_rules = _frontmatter(content)
     if values is None:
         findings.append(
             f"{_shown(skill_file, root)}: frontmatter must be between the first two --- lines"
         )
         return content
 
-    if values.get("name") != skill_name:
+    for rule in frontmatter_rules:
+        findings.append(f"{_shown(skill_file, root)}: {rule}")
+
+    if "name" not in values:
+        findings.append(
+            f"{_shown(skill_file, root)}: frontmatter name is required"
+        )
+    elif values["name"] != skill_name:
         findings.append(
             f"{_shown(skill_file, root)}: frontmatter name must exactly match {skill_name}"
         )
 
     description = values.get("description", "")
-    if not description.startswith("Use when"):
+    if re.fullmatch(r"Use when\s+\S.*", description) is None:
         findings.append(
-            f"{_shown(skill_file, root)}: frontmatter description must be non-empty and begin with Use when"
+            f"{_shown(skill_file, root)}: frontmatter description must begin with Use when and include trigger text"
         )
     else:
         descriptions.setdefault(description, []).append(skill_file)
