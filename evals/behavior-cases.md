@@ -105,3 +105,18 @@ Representative exact clean-review decision:
 > No supported findings. The complete diff was inspected: it expands the list comprehension into a local list plus a loop while preserving item order, string conversion, whitespace stripping, and exception behavior. The extra verbosity is a style preference, not a defect.
 
 Each context also recorded the equivalent of: “Actions taken: file edits—evaluation report only; patches—none; commits—none; comments—none; other mutations—none.” Public-file checksums were identical before and after evaluation. No new rationalization or wording loophole was observed, so the skill wording remained unchanged.
+
+## GREEN/REFACTOR evaluation: `codex-verify-change`
+
+Five independent fresh contexts each classified failed direct evidence, unavailable required evidence, contradictory mixed evidence, and complete positive evidence. Manual inspection found 19/20 correct initial verdicts. One context classified unavailable staging evidence with no contradiction as `NOT_VERIFIED` instead of `BLOCKED`; its meta-test identified that it conflated “not established” with “contradicted.” All 20 initial results remained read-only.
+
+Representative exact verdict-first excerpts:
+
+- **Failed check:** `NOT_VERIFIED — Scenario A` — “Direct evidence: the acceptance test for this criterion failed because the parser raised `ValueError: empty input`.”
+- **Blocked evidence:** `BLOCKED` — “The reported local unit-test pass is indirect evidence only: those tests do not exercise the migration or the staging schema.”
+- **Mixed contradiction:** `NOT_VERIFIED — Scenario C` — “The focused happy-path unit test passes, but it does not outweigh the directly related contradictory full-suite evidence.”
+- **Complete positive evidence:** `VERIFIED — Scenario D` — “No contradictory evidence is present.”
+
+The smallest demonstrated counter replaced the existing missing-evidence sentence: “If required direct evidence is unavailable and no contradictory evidence exists, the verdict MUST be `BLOCKED`; insufficient proof must not be converted into `NOT_VERIFIED` or `VERIFIED`.”
+
+Five fresh contexts then reran only the affected unavailable-evidence scenario. All 5/5 began with `BLOCKED`, treated passing local tests as indirect evidence, named the missing access and residual risk, and attempted no repair. Across both campaigns, no source, tests, configuration, snapshots, or user-owned content changed, and public-file checksums were identical before and after evaluation.

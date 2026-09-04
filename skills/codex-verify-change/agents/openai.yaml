@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex: Verify Change"
+  short_description: "Verify changes with explicit evidence"
+  default_prompt: "Use $codex-verify-change to verify this change without repairing it."
+
+policy:
+  allow_implicit_invocation: true
