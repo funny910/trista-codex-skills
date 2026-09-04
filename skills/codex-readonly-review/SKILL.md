@@ -7,7 +7,7 @@ description: Use when a user asks for a code, diff, branch, or pull-request revi
 
 ## Core contract
 
-Inspect and report; do not modify files, apply patches, reformat code, create commits, post comments, or repair findings. This remains true when a combined request says to review and fix. Complete and report the review first, then stop. Begin a separate implementation phase only after the user explicitly authorizes its repair scope.
+Inspect and report; do not modify files, apply patches, reformat code, create commits, post comments, or repair findings. This skill remains strictly read-only when a combined request says to review and fix. Complete and report the review before any mutation, state the exact repair scope authorized by the original request (if any), then stop. Any repair occurs in a separate implementation phase limited to that scope; when the original request authorized no repair scope, obtain new authorization first.
 
 ## Workflow
 
