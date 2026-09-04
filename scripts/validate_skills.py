@@ -38,12 +38,16 @@ def _read_text(path: Path, root: Path, findings: list[str]) -> Optional[str]:
         return None
 
 
-def _has_yaml_disallowed_control(content: str) -> bool:
+def _has_unsupported_yaml_codepoint(content: str) -> bool:
     for character in content:
         codepoint = ord(character)
         if codepoint < 0x20 and character not in "\t\n\r":
             return True
-        if 0x7F <= codepoint <= 0x84 or 0x86 <= codepoint <= 0x9F:
+        if 0x7F <= codepoint <= 0x9F:
+            return True
+        if codepoint in {0x2028, 0x2029, 0xFFFE, 0xFFFF}:
+            return True
+        if 0xD800 <= codepoint <= 0xDFFF:
             return True
     return False
 
@@ -62,9 +66,10 @@ def _frontmatter(
     values: dict[str, str] = {}
     seen_keys: set[str] = set()
     rules: list[str] = []
-    if _has_yaml_disallowed_control("\n".join(lines[1:closing])):
+    if _has_unsupported_yaml_codepoint("\n".join(lines[1:closing])):
         rules.append(
-            "frontmatter must not contain YAML-disallowed control characters"
+            "frontmatter must not contain unsupported control, line-separator, "
+            "or noncharacter code points"
         )
 
     for line in lines[1:closing]:
@@ -116,8 +121,11 @@ def _agent_metadata(
     current_section: Optional[str] = None
     accept_nested_keys = False
 
-    if _has_yaml_disallowed_control(content):
-        rules.append("metadata must not contain YAML-disallowed control characters")
+    if _has_unsupported_yaml_codepoint(content):
+        rules.append(
+            "metadata must not contain unsupported control, line-separator, "
+            "or noncharacter code points"
+        )
 
     for line in content.split("\n"):
         if "\t" in line:

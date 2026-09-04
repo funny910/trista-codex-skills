@@ -227,8 +227,34 @@ class ValidatorTests(unittest.TestCase):
 
             self._assert_rejected(
                 fixture,
-                "frontmatter must not contain YAML-disallowed control characters",
+                "frontmatter must not contain unsupported control, line-separator, "
+                "or noncharacter code points",
             )
+
+    def test_validator_rejects_unsupported_frontmatter_codepoints(self):
+        codepoints = (
+            ("next-line", "\u0085"),
+            ("line-separator", "\u2028"),
+            ("paragraph-separator", "\u2029"),
+            ("noncharacter-fffe", "\ufffe"),
+            ("noncharacter-ffff", "\uffff"),
+        )
+        for name, character in codepoints:
+            with (
+                self.subTest(name=name),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                skill_file = self._skill_file(fixture)
+                lines = skill_file.read_text().splitlines()
+                lines[2] = f"description: Use when alpha{character}beta"
+                skill_file.write_text("\n".join(lines) + "\n")
+
+                self._assert_rejected(
+                    fixture,
+                    "frontmatter must not contain unsupported control, "
+                    "line-separator, or noncharacter code points",
+                )
 
     def test_validator_rejects_frontmatter_angle_brackets(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -341,8 +367,38 @@ class ValidatorTests(unittest.TestCase):
 
             self._assert_rejected(
                 fixture,
-                "metadata must not contain YAML-disallowed control characters",
+                "metadata must not contain unsupported control, line-separator, "
+                "or noncharacter code points",
             )
+
+    def test_validator_rejects_unsupported_metadata_codepoints(self):
+        codepoints = (
+            ("next-line", "\u0085"),
+            ("line-separator", "\u2028"),
+            ("paragraph-separator", "\u2029"),
+            ("noncharacter-fffe", "\ufffe"),
+            ("noncharacter-ffff", "\uffff"),
+        )
+        for name, character in codepoints:
+            with (
+                self.subTest(name=name),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                metadata_file = self._metadata_file(fixture)
+                metadata_file.write_text(
+                    metadata_file.read_text().replace(
+                        "Codex: Implement Change",
+                        f"Codex: Implement{character}Change",
+                        1,
+                    )
+                )
+
+                self._assert_rejected(
+                    fixture,
+                    "metadata must not contain unsupported control, "
+                    "line-separator, or noncharacter code points",
+                )
 
     def test_validator_rejects_duplicate_metadata_section(self):
         with tempfile.TemporaryDirectory() as directory:
