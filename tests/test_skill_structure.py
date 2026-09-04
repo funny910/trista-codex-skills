@@ -203,6 +203,60 @@ class ValidatorTests(unittest.TestCase):
                     "include trigger text",
                 )
 
+    def test_validator_rejects_non_alphanumeric_trigger_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            lines = skill_file.read_text().splitlines()
+            lines[2] = "description: Use when ___"
+            skill_file.write_text("\n".join(lines) + "\n")
+
+            self._assert_rejected(
+                fixture,
+                "frontmatter description must begin with Use when and include "
+                "trigger text",
+            )
+
+    def test_validator_rejects_frontmatter_control_characters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            lines = skill_file.read_text().splitlines()
+            lines[2] = "description: Use when a\x00change is requested"
+            skill_file.write_text("\n".join(lines) + "\n")
+
+            self._assert_rejected(
+                fixture,
+                "frontmatter must not contain YAML-disallowed control characters",
+            )
+
+    def test_validator_rejects_frontmatter_angle_brackets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            lines = skill_file.read_text().splitlines()
+            lines[2] = "description: Use when <foo> is requested"
+            skill_file.write_text("\n".join(lines) + "\n")
+
+            self._assert_rejected(
+                fixture, "frontmatter description must not contain angle brackets"
+            )
+
+    def test_validator_rejects_overlong_frontmatter_description(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            skill_file = self._skill_file(fixture)
+            description = "Use when " + "x" * 1016
+            self.assertEqual(1025, len(description))
+            lines = skill_file.read_text().splitlines()
+            lines[2] = f"description: {description}"
+            skill_file.write_text("\n".join(lines) + "\n")
+
+            self._assert_rejected(
+                fixture,
+                "frontmatter description must be at most 1024 characters",
+            )
+
     def test_validator_reports_malformed_frontmatter_and_missing_reference(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._copy_skills(directory)
@@ -250,6 +304,140 @@ class ValidatorTests(unittest.TestCase):
                 "ERROR: skills/codex-implement-change/agents/openai.yaml: "
                 "interface.default_prompt must name $codex-implement-change",
                 result.stdout,
+            )
+
+    def test_validator_rejects_orphan_and_tabbed_metadata_junk(self):
+        cases = (
+            (
+                "orphan sequence",
+                "\n- orphan-sequence-item\n",
+                "metadata must contain only supported sections and exactly "
+                "two-space scalar keys",
+            ),
+            (
+                "tab indentation",
+                "\n\torphan: value\n",
+                "metadata must not contain tab characters",
+            ),
+        )
+        for case, suffix, expected_rule in cases:
+            with (
+                self.subTest(case=case),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                metadata_file = self._metadata_file(fixture)
+                metadata_file.write_text(metadata_file.read_text() + suffix)
+
+                self._assert_rejected(fixture, expected_rule)
+
+    def test_validator_rejects_metadata_control_characters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            metadata_file = self._metadata_file(fixture)
+            metadata_file.write_text(
+                metadata_file.read_text() + "\n# invalid\x00comment\n"
+            )
+
+            self._assert_rejected(
+                fixture,
+                "metadata must not contain YAML-disallowed control characters",
+            )
+
+    def test_validator_rejects_duplicate_metadata_section(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            metadata_file = self._metadata_file(fixture)
+            metadata_file.write_text(
+                metadata_file.read_text()
+                + "\npolicy:\n  allow_implicit_invocation: false\n"
+            )
+
+            self._assert_rejected(
+                fixture, "metadata section policy must not be duplicated"
+            )
+
+    def test_validator_rejects_duplicate_implicit_invocation_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            metadata_file = self._metadata_file(fixture)
+            metadata_file.write_text(
+                metadata_file.read_text().replace(
+                    "  allow_implicit_invocation: true",
+                    "  allow_implicit_invocation: true\n"
+                    "  allow_implicit_invocation: false",
+                    1,
+                )
+            )
+
+            self._assert_rejected(
+                fixture,
+                "metadata key policy.allow_implicit_invocation must not be "
+                "duplicated",
+            )
+
+    def test_validator_rejects_duplicate_default_prompt_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            metadata_file = self._metadata_file(fixture)
+            metadata_file.write_text(
+                metadata_file.read_text().replace(
+                    "\n\npolicy:",
+                    '\n  default_prompt: "Do something else."\n\npolicy:',
+                    1,
+                )
+            )
+
+            self._assert_rejected(
+                fixture,
+                "metadata key interface.default_prompt must not be duplicated",
+            )
+
+    def test_validator_rejects_unknown_metadata_sections_and_keys(self):
+        cases = (
+            (
+                "section",
+                "\nextra:\n  value: \"unsupported\"\n",
+                "metadata section extra is unsupported",
+            ),
+            (
+                "key",
+                '\n  extra: "unsupported"',
+                "metadata key interface.extra is unsupported",
+            ),
+        )
+        for case, addition, expected_rule in cases:
+            with (
+                self.subTest(case=case),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                fixture = self._copy_skills(directory)
+                metadata_file = self._metadata_file(fixture)
+                content = metadata_file.read_text()
+                if case == "section":
+                    content += addition
+                else:
+                    content = content.replace("\n\npolicy:", addition + "\n\npolicy:", 1)
+                metadata_file.write_text(content)
+
+                self._assert_rejected(fixture, expected_rule)
+
+    def test_validator_rejects_metadata_backslash_escapes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._copy_skills(directory)
+            metadata_file = self._metadata_file(fixture)
+            metadata_file.write_text(
+                metadata_file.read_text().replace(
+                    "Use $codex-implement-change",
+                    "Use \\q $codex-implement-change",
+                    1,
+                )
+            )
+
+            self._assert_rejected(
+                fixture,
+                "interface.default_prompt must be a non-empty double-quoted "
+                "string without backslashes",
             )
 
     def test_validator_rejects_false_or_missing_implicit_invocation(self):

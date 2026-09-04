@@ -14,6 +14,10 @@ EXPECTED_SKILLS = {
 REQUIRED_FILES = ("SKILL.md", "agents/openai.yaml")
 REQUIRED_INTERFACE_KEYS = ("display_name", "short_description", "default_prompt")
 SUPPORTED_FRONTMATTER_KEYS = {"name", "description"}
+SUPPORTED_METADATA_KEYS = {
+    "interface": set(REQUIRED_INTERFACE_KEYS),
+    "policy": {"allow_implicit_invocation"},
+}
 UNFINISHED_MARKERS = ("TODO", "TBD")
 
 
@@ -34,10 +38,20 @@ def _read_text(path: Path, root: Path, findings: list[str]) -> Optional[str]:
         return None
 
 
+def _has_yaml_disallowed_control(content: str) -> bool:
+    for character in content:
+        codepoint = ord(character)
+        if codepoint < 0x20 and character not in "\t\n\r":
+            return True
+        if 0x7F <= codepoint <= 0x84 or 0x86 <= codepoint <= 0x9F:
+            return True
+    return False
+
+
 def _frontmatter(
     content: str,
 ) -> tuple[Optional[dict[str, str]], list[str]]:
-    lines = content.splitlines()
+    lines = content.split("\n")
     if not lines or lines[0] != "---":
         return None, []
     try:
@@ -48,6 +62,11 @@ def _frontmatter(
     values: dict[str, str] = {}
     seen_keys: set[str] = set()
     rules: list[str] = []
+    if _has_yaml_disallowed_control("\n".join(lines[1:closing])):
+        rules.append(
+            "frontmatter must not contain YAML-disallowed control characters"
+        )
+
     for line in lines[1:closing]:
         if "\t" in line:
             rules.append("frontmatter must not contain tab characters")
@@ -88,22 +107,77 @@ def _frontmatter(
     return values, rules
 
 
-def _section_value(content: str, section: str, key: str) -> Optional[str]:
-    lines = content.splitlines()
-    in_section = False
-    for line in lines:
-        if re.fullmatch(rf"{re.escape(section)}:\s*", line):
-            in_section = True
+def _agent_metadata(
+    content: str,
+) -> tuple[dict[str, dict[str, str]], list[str]]:
+    values = {section: {} for section in SUPPORTED_METADATA_KEYS}
+    rules: list[str] = []
+    seen_sections: set[str] = set()
+    current_section: Optional[str] = None
+    accept_nested_keys = False
+
+    if _has_yaml_disallowed_control(content):
+        rules.append("metadata must not contain YAML-disallowed control characters")
+
+    for line in content.split("\n"):
+        if "\t" in line:
+            rules.append("metadata must not contain tab characters")
+            current_section = None
+            accept_nested_keys = False
             continue
-        if in_section and line and not line[0].isspace():
-            return None
-        if in_section:
-            match = re.fullmatch(
-                rf"  {re.escape(key)}:\s*(.*?)\s*", line
-            )
-            if match:
-                return match.group(1)
-    return None
+
+        stripped = line.strip(" ")
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        section_match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_-]*):", line)
+        if section_match:
+            section = section_match.group(1)
+            current_section = section
+            accept_nested_keys = False
+            if section not in SUPPORTED_METADATA_KEYS:
+                rules.append(f"metadata section {section} is unsupported")
+            elif section in seen_sections:
+                rules.append(f"metadata section {section} must not be duplicated")
+            else:
+                seen_sections.add(section)
+                accept_nested_keys = True
+            continue
+
+        key_match = re.fullmatch(
+            r"  ([A-Za-z_][A-Za-z0-9_-]*): +(.+)", line
+        )
+        if key_match:
+            if current_section is None:
+                rules.append(
+                    "metadata nested keys must belong to a supported section"
+                )
+                continue
+            if not accept_nested_keys:
+                continue
+
+            key, value = key_match.group(1), key_match.group(2).rstrip(" ")
+            if key not in SUPPORTED_METADATA_KEYS[current_section]:
+                rules.append(
+                    f"metadata key {current_section}.{key} is unsupported"
+                )
+            elif key in values[current_section]:
+                rules.append(
+                    f"metadata key {current_section}.{key} must not be duplicated"
+                )
+            else:
+                values[current_section][key] = value
+            continue
+
+        if not line.startswith(" "):
+            current_section = None
+            accept_nested_keys = False
+        rules.append(
+            "metadata must contain only supported sections and exactly "
+            "two-space scalar keys"
+        )
+
+    return values, rules
 
 
 def _validate_frontmatter(
@@ -145,11 +219,25 @@ def _validate_frontmatter(
 
     description = values.get("description", "")
     trigger = re.fullmatch(r"Use when +(.+)", description)
-    if trigger is None or re.search(r"\w", trigger.group(1)) is None:
+    description_is_valid = True
+    if trigger is None or not any(
+        character.isalnum() for character in trigger.group(1)
+    ):
         findings.append(
             f"{_shown(skill_file, root)}: frontmatter description must begin with Use when and include trigger text"
         )
-    else:
+        description_is_valid = False
+    if len(description) > 1024:
+        findings.append(
+            f"{_shown(skill_file, root)}: frontmatter description must be at most 1024 characters"
+        )
+        description_is_valid = False
+    if "<" in description or ">" in description:
+        findings.append(
+            f"{_shown(skill_file, root)}: frontmatter description must not contain angle brackets"
+        )
+        description_is_valid = False
+    if description_is_valid:
         descriptions.setdefault(description, []).append(skill_file)
 
     return content
@@ -165,19 +253,24 @@ def _validate_agent_metadata(
     if content is None:
         return
 
+    metadata, metadata_rules = _agent_metadata(content)
+    for rule in metadata_rules:
+        findings.append(f"{_shown(metadata_file, root)}: {rule}")
+
     values: dict[str, str] = {}
     for key in REQUIRED_INTERFACE_KEYS:
-        value = _section_value(content, "interface", key)
+        value = metadata["interface"].get(key)
         if value is None:
             findings.append(
                 f"{_shown(metadata_file, root)}: interface.{key} is required"
             )
             continue
-        if not re.fullmatch(r'"[^"\n]+"', value):
+        if not re.fullmatch(r'"[^"\\]+"', value) or not value[1:-1].strip():
             findings.append(
-                f"{_shown(metadata_file, root)}: interface.{key} must be a non-empty quoted string"
+                f"{_shown(metadata_file, root)}: interface.{key} must be a non-empty double-quoted string without backslashes"
             )
-        values[key] = value
+            continue
+        values[key] = value[1:-1]
 
     default_prompt = values.get("default_prompt", "")
     skill_token = re.compile(rf"\${re.escape(skill_name)}(?![A-Za-z0-9_-])")
@@ -186,7 +279,7 @@ def _validate_agent_metadata(
             f"{_shown(metadata_file, root)}: interface.default_prompt must name ${skill_name}"
         )
 
-    implicit = _section_value(content, "policy", "allow_implicit_invocation")
+    implicit = metadata["policy"].get("allow_implicit_invocation")
     if implicit != "true":
         findings.append(
             f"{_shown(metadata_file, root)}: policy.allow_implicit_invocation must be true"
