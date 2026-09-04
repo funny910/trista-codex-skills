@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex: Read-only Review"
+  short_description: "Find evidence-backed code risks"
+  default_prompt: "Use $codex-readonly-review to review this change without modifying files."
+
+policy:
+  allow_implicit_invocation: true
