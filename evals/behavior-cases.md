@@ -1,5 +1,17 @@
 # Behavior Cases
 
+## Planning-skill expectations (not executed)
+
+These cases accompany the 2026-10-19 distribution of `story-to-film-planner`. They are reviewable expectations, not recorded model runs or media validation.
+
+| Request | Expected boundary |
+| --- | --- |
+| Plan only a storyboard from an existing script. | Preserve confirmed story decisions; omit CLIP grouping, identifiers, and checks unless production handoff or clip planning is requested. |
+| Draft a static character-image prompt from asset specifications. | Use asset specifications directly; require neither a storyboard nor CLIP, and mark the platform-neutral prompt unverified. |
+| Continue from an accepted project workbook. | Reuse valid decisions; preserve outline, style, duration, aspect-ratio, sound, and subtitle confirmation points; do not reopen general U07 preferences or generate media. |
+
+## Historical engineering-skill evaluation records
+
 These are RED baselines recorded from fresh no-skill contexts. The raw-response
 cells reproduce the supplied observed response; listed actions are stated intent,
 not executed file or command activity.

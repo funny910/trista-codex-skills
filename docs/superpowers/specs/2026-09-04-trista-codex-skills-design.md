@@ -443,3 +443,13 @@ The next stage is:
 2. a detailed implementation plan derived from the approved specification;
 3. implementation only after that plan is accepted for execution.
 
+## 19. Owner-directed planning-skill distribution — 2026-10-19
+
+The owner requested distribution of the already accepted `story-to-film-planner` planning documents in this repository. This addition extends the shipped inventory to four skills; the three V1 engineering contracts remain unchanged.
+
+- The new skill lives at `skills/story-to-film-planner/` and may create or revise authorized narrative animated-short planning documents only. It does not authorize code changes, media generation, editing, upload, or publication.
+- Preserve its accepted Chinese body and reference files. Use an English `Use when` frontmatter trigger and the same required Codex metadata as the existing skills. This is a scoped exception to section 16's English-body convention.
+- The four-skill inventory supersedes section 17's exact three-skill inventory. The engineering implementation/review/verification authority matrix remains intact; planning-document authoring is the new skill's separate scope.
+- Preserve the accepted decisions and confirmation points. Do not reopen general U07 preferences as part of distribution.
+- Run the existing structural validator and unit suite. New routing and behavior cases are expectations only; do not claim a story trial, installation, or media validation.
+- This repository upload is explicitly authorized by the owner. It does not enable publication or other external actions when the planning skill is later used.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "剧本到短片制作规划"
+  short_description: "将剧情动画短片的故事整理为角色、场景资产与分镜规划文档"
+  default_prompt: "Use $story-to-film-planner to plan character assets, scene assets, and storyboards from my story while preserving confirmed decisions and keeping all work within planning documents."
+
+policy:
+  allow_implicit_invocation: true

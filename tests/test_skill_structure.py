@@ -10,6 +10,7 @@ EXPECTED_SKILLS = {
     "codex-implement-change",
     "codex-readonly-review",
     "codex-verify-change",
+    "story-to-film-planner",
 }
 REQUIRED_FILES = {"SKILL.md", "agents/openai.yaml"}
 

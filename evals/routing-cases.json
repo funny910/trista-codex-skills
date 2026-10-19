@@ -6,5 +6,8 @@
   {"id":"verify-claim","prompt":"Verify whether the fix meets the acceptance criteria.","expected_skill":"codex-verify-change","mutation_allowed":false},
   {"id":"verify-failure-no-repair","prompt":"Independently verify the branch; do not repair anything if it fails.","expected_skill":"codex-verify-change","mutation_allowed":false},
   {"id":"review-then-authorized-fix","prompt":"Review the change, then fix only the P1 findings you confirm.","expected_sequence":["codex-readonly-review","codex-implement-change"],"mutation_allowed":"phase-dependent"},
-  {"id":"explain-not-edit","prompt":"Explain why this function is slow; do not change code.","expected_skill":null,"mutation_allowed":false}
+  {"id":"explain-not-edit","prompt":"Explain why this function is slow; do not change code.","expected_skill":null,"mutation_allowed":false},
+  {"id":"animated-short-planning","prompt":"Use $story-to-film-planner to plan character assets, scenes, and storyboards for my animated short. Do not generate media.","expected_skill":"story-to-film-planner","mutation_allowed":"planning-documents-only"},
+  {"id":"static-asset-prompt","prompt":"Use $story-to-film-planner to write an unverified, platform-neutral character-image prompt from these asset specifications. No storyboard or video is needed.","expected_skill":"story-to-film-planner","mutation_allowed":"planning-documents-only"},
+  {"id":"media-production-only","prompt":"Generate and publish a finished animated video now; I do not need planning documents.","expected_skill":null,"mutation_allowed":false}
 ]
