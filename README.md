@@ -13,7 +13,7 @@ Trista Codex Skills is a small, Codex-native collection for three distinct softw
 | `codex-implement-change` | The user explicitly asks to fix, add, change, remove, migrate, or refactor repository files. | Yes — only within the user-authorized repository scope. |
 | `codex-readonly-review` | The user asks for a code, diff, branch, or pull-request review, audit, or risk assessment without authorizing edits. | No — strictly read-only; it does not repair findings. |
 | `codex-verify-change` | The user asks whether a change works, fixes a problem, meets acceptance criteria, or is ready according to available evidence. | No — strictly read-only; it does not repair failures. |
-| `story-to-film-planner` | The user wants narrative animated-short planning from an idea, story, script, assets, or an existing storyboard. | Planning documents only; no media generation, editing, upload, or publication. |
+| `story-to-film-planner` | The user wants narrative animated-short planning from an idea, story, script, reference images, or an existing storyboard. Not for live-action, advertising, or product films. | Planning documents only; no media generation, editing, upload, or publication. |
 
 Within the engineering trio, only `codex-implement-change` may mutate files, and only inside the repository scope the user authorized. `codex-readonly-review` and `codex-verify-change` are strictly read-only. `story-to-film-planner` may create or revise authorized planning documents; it does not authorize repository code changes or media production.
 
@@ -28,11 +28,11 @@ Verification begins with exactly one verdict: `VERIFIED` when all material crite
 | “Verify whether this fix meets the acceptance criteria.” | `codex-verify-change` | Read-only evidence and one verdict. |
 | “Review the change, then fix only confirmed P1 findings.” | `codex-readonly-review`, then `codex-implement-change` | Review finishes first; mutation starts only in a separate, explicitly authorized repair phase. |
 | “Explain why this function is slow; do not change it.” | No skill in this pack | Explanation remains read-only. |
-| “Plan characters, scenes, and storyboards for this animated short; do not generate media.” | `story-to-film-planner` | May write requested planning documents and inspect authorized assets. |
+| “Plan characters, scenes, and storyboards for this animated short; do not generate media.” | `story-to-film-planner` | May write requested planning documents and inspect reference images the user provides. |
 
 For engineering tasks, analysis or planning alone does not authorize implementation. Failed verification does not trigger repair. No skill invokes another skill automatically, and mixed wording uses the stricter authority until mutation intent is clear.
 
-The planning skill preserves its accepted Chinese body and rules. Outline, style, duration, aspect-ratio, sound, and subtitle decisions remain with the user. It normally delivers one project workbook and includes platform-neutral prompt drafts only when requested. Clip grouping is optional. Its planning documents have been accepted and statically checked; this distribution does not claim a story trial or verified media results.
+The planning skill's body and rules are written in Chinese. Its U01–U08 entries are author-set default rules (`【默认规则】`): they apply without re-asking but are never recorded as the current user's confirmation, and a user's own request overrides them within its stated scope. Per-project creative choices are marked `【项目判断】`; only U08 acceptance standards are left for the user to calibrate. Outline, style, duration, aspect-ratio, sound, and subtitle decisions remain with the user. It normally delivers one project workbook that tracks SRC (source), AST (asset), SH (shot), optional CLIP (production clip), and D (decision) codes, reads only the method-library entries a question needs, and includes unverified, platform-neutral prompt drafts only when requested. Any future generation would require a fresh quote and explicit approval for each submission. The files pass the repository's static checks; this distribution does not claim a story trial or verified media results.
 
 ## Installation
 
